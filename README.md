@@ -47,7 +47,7 @@
         - [x] Metadata download from peers [\[BEP0009\]][BEP0009]
   - [x] Announce list / Multitracker support [\[BEP0012\]][BEP0012]
   - [ ] Visual terminal progress for downloaded pieces?
-      - Consider TUI/terminal graphics for this
+      - [] Consider TUI/terminal graphics for this
 
     <!-- Reference Links -->
     [BEP0003]: https://wiki.theory.org/BitTorrentSpecification#Related_Documents "Bittorrent Specifications"
