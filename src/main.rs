@@ -22,7 +22,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let peer_id: [u8; 20] = rand::thread_rng().r#gen();
     let port = 6881;
 
-    let torrent_path = "src/debian.torrent";
+    let torrent_path = "src/.torrent-files/debian.torrent";
     let torrent_file = TorrentFile::from_file(torrent_path).map_err(|e| {
         eprintln!("Torrent file error: {:?}", e);
         panic!("Failed to parse torrent file: {:?}", e);
