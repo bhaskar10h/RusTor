@@ -3,7 +3,7 @@ use crate::Torrentfile::magnet::parse_magnet_link;
 use crate::Torrentfile::torrent::TorrentFile;
 use crate::Tracker::tracker::query_http_tracker;
 use crate::Tracker::udp::query_udp_tracker;
-use bittorent::connect_to_peer;
+use crate::bittorent::connect_to_peer;
 use rand::Rng;
 
 #[allow(non_snake_case)]
@@ -22,20 +22,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let peer_id: [u8; 20] = rand::thread_rng().r#gen();
     let port = 6881;
 
-    // Use a relative path to the torrent file
-    let torrent_path = "src/nasa.torrent"; // Ensure this file exists in the project root
-    let torrent_file = TorrentFile::from_file(torrent_path)?;
+    let torrent_path = "src/debian.torrent";
+    let torrent_file = TorrentFile::from_file(torrent_path).map_err(|e| {
+        eprintln!("Torrent file error: {:?}", e);
+        panic!("Failed to parse torrent file: {:?}", e);
+    })?;
     let info_hash = torrent_file.info_hash;
-    let announce = torrent_file.torrent.announce;
+    let announce = torrent_file.torrent.announce.clone();
 
-    // Example: Load from magnet link (optional, keep or remove as needed)
+    // Example magnet link parsing (optional)
     let magnet = parse_magnet_link(
         "magnet:?xt=urn:btih:1234567890123456789012345678901234567890&tr=udp://tracker.example.com:6969",
     )?;
     let info_hash_magnet = magnet.infohash;
     let trackers = magnet.trackers;
 
-    // Query tracker (HTTP or UDP)
+    // Query tracker
     let tracker_response = if announce.starts_with("http") {
         query_http_tracker(
             &announce,
@@ -45,9 +47,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             0,
             torrent_file.torrent.info.length,
             0,
-        )?
+        )
+        .map_err(|e| {
+            eprintln!("HTTP tracker error: {:?}", e);
+            panic!("Failed to query HTTP tracker: {:?}", e);
+        })?
+    } else if announce.starts_with("udp") {
+        query_udp_tracker(&announce, info_hash, peer_id, port)
+            .await
+            .map_err(|e| {
+                eprintln!("UDP tracker error: {:?}", e);
+                panic!("Failed to query UDP tracker: {:?}", e);
+            })?
     } else {
-        query_udp_tracker(&announce, info_hash, peer_id, port).await?
+        return Err("Unsupported tracker protocol".into());
     };
 
     // Connect to a peer

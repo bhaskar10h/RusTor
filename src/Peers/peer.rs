@@ -15,7 +15,7 @@ impl Handshake {
     pub fn new(infohash: [u8; 20], peer_id: [u8; 20]) -> Self {
         Self {
             length: 19,
-            protocol: *b"Bittorrent protocol",
+            protocol: *b"BitTorrent protocol",
             reserved: [0; 8],
             infohash,
             peer_id,
@@ -29,7 +29,6 @@ impl Handshake {
         bytes.extend_from_slice(&self.reserved);
         bytes.extend_from_slice(&self.infohash);
         bytes.extend_from_slice(&self.peer_id);
-
         bytes
     }
 
@@ -40,6 +39,10 @@ impl Handshake {
         stream.write_all(&handshake.to_bytes()).await?;
         let mut response = [0u8; 68];
         stream.read_exact(&mut response).await?;
+        // Verify response
+        if response[0] != 19 || &response[1..20] != b"BitTorrent protocol" {
+            return Err("Invalid handshake response".into());
+        }
         Ok(())
     }
 
@@ -52,10 +55,10 @@ impl Handshake {
     pub async fn request_piece(
         stream: &mut TcpStream,
         index: u32,
-        length: u32,
         begin: u32,
+        length: u32,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        let mut message = vec![0, 0, 0, 13, 6]; // ID 6: Request 13 bytes
+        let mut message = vec![0, 0, 0, 13, 6]; // ID 6: Request, 13 bytes
         message.extend_from_slice(&index.to_be_bytes());
         message.extend_from_slice(&begin.to_be_bytes());
         message.extend_from_slice(&length.to_be_bytes());
