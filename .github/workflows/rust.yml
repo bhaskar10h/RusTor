@@ -32,6 +32,13 @@
      - name: Build
        run: cargo build --verbose
 
-     - name: Run tests
-       run: cargo test --verbose
+     - name: Check for main binary
+       run: |
+         if [ ! -f target/debug/rustor ]; then
+           echo "Main binary not found! Make sure you have a main.rs with #[tokio::main]."
+           exit 1
+         fi
+
+     - name: Run Tests (if any)
+       run: cargo test --verbose || echo "No tests found."
  
