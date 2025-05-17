@@ -38,24 +38,22 @@
   cargo run  
   ```
 
-   ## ✅ TODO
+  ## ✅ TODO
 
-  - [ ] Seeding support for original `.torrent` protocol
-  - [x] Magnet links
-    - [ ] UDP Trackers  – acquire peers from a UDP tracker
-      - [ ] UDP Extensions
-      - [x] Metadata download from peers 
-  - [x] Announce list / Multitracker support 
+  - [ ] Seeding support for original `.torrent` protocol [\[BEP0003\]][BEP0003]
+  - [x] Magnet links [\[BEP0009\]][BEP0009]
+    - [ ] UDP Trackers – acquire peers from a UDP tracker [\[BEP0015\]][BEP0015]
+        - [ ] UDP Extensions
+        - [x] Metadata download from peers [\[BEP0009\]][BEP0009]
+  - [x] Announce list / Multitracker support [\[BEP0012\]][BEP0012]
   - [ ] Visual terminal progress for downloaded pieces?
       - Consider TUI/terminal graphics for this
 
+    ## Reference
 
-  ## Reference
-
-  <!-- Reference Links -->
-  [BEP0003]: https://wiki.theory.org/BitTorrentSpecification#Related_Documents "Bittorrent Specifications"
-  [BEP0015]: https://bittorrent.org/bittorrentecon.pdf "Incentives Build Robustness in BitTorrent"
-  [BEP0041]: https://bittorrent.org/beps/bep_0003.html "BitTorent.org"
-  [BEP0009]: http://bittorrent.org/beps/bep_0009.html "Extension for Peers to Send Metadata Files"
-  [BEP0012]: http://bittorrent.org/beps/bep_0012.html "Multitracker Metadata Extension"
-  
+    <!-- Reference Links -->
+    [BEP0003]: https://wiki.theory.org/BitTorrentSpecification#Related_Documents "Bittorrent Specifications"
+    [BEP0015]: https://bittorrent.org/beps/bep_0015.html "UDP Tracker Protocol"
+    [BEP0041]: https://bittorrent.org/beps/bep_0041.html "Distributed Hash Table (DHT)"
+    [BEP0009]: http://bittorrent.org/beps/bep_0009.html "Extension for Peers to Send Metadata Files"
+    [BEP0012]: http://bittorrent.org/beps/bep_0012.html "Multitracker Metadata Extension"
