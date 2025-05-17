@@ -10,10 +10,10 @@
 
   ## Features
 
-  -[x] **Bencode Parsing**: Encode and decode Bencode data for torrent files.
-  -[x] **Torrent File Support**: Parse and process `.torrent` files and magnet links.
-  -[x] **Peer Communication**: Connect and interact with peers for data exchange.
-  -[x] **Tracker Interaction**: Communicate with HTTP and UDP trackers to retrieve peer information.
+  - [x] **Bencode Parsing**: Encode and decode Bencode data for torrent files.
+  - [x] **Torrent File Support**: Parse and process `.torrent` files and magnet links.
+  - [x] **Peer Communication**: Connect and interact with peers for data exchange.
+  - [x] **Tracker Interaction**: Communicate with HTTP and UDP trackers to retrieve peer information.
 
 
   ## Getting Started
@@ -48,8 +48,6 @@
   - [x] Announce list / Multitracker support [\[BEP0012\]][BEP0012]
   - [ ] Visual terminal progress for downloaded pieces?
       - Consider TUI/terminal graphics for this
-
-    ## Reference
 
     <!-- Reference Links -->
     [BEP0003]: https://wiki.theory.org/BitTorrentSpecification#Related_Documents "Bittorrent Specifications"
