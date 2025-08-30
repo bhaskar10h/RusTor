@@ -1,12 +1,19 @@
-use anyhow::Result;
+use anyhow::{Result, anyhow, bail};
 use reqwest::Client;
 use serde::{Deserialize, Deserializer, Serialize, de};
-// use serde_bytes::ByteBuf;
+use serde_bytes::ByteBuf;
 use std::net::{Ipv4Addr, SocketAddrV4};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TrackerResponse {
     pub peers: Vec<SocketAddrV4>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+enum PeersField {
+    Compact(ByteBuf),
+    NonCompact(Vec<PeerDict>),
 }
 
 // Defines PeerDict for non-compact format
@@ -70,7 +77,12 @@ where
 
 #[derive(Debug, Deserialize)]
 struct RawTrackerResponse {
-    pub peers: serde_bytes::ByteBuf,
+    #[serde(default)]
+    failure_reason: Option<String>,
+
+    #[serde(default)]
+    warning_message: Option<String>,
+    peers: PeersField,
 }
 
 pub async fn query_http_tracker(
@@ -90,20 +102,42 @@ pub async fn query_http_tracker(
         "{}?info_hash={}&peer_id={}&port={}&uploaded={}&downloaded={}&left={}&compact=1",
         announce, infohash_encoded, peer_id_encoded, port, uploaded, downloaded, left
     );
-    let bytes = client.get(&url).send().await?.bytes().await?;
-    let raw: RawTrackerResponse = serde_bencode::from_bytes(&bytes)?;
-    if raw.peers.len() % 6 != 0 {
-        anyhow::bail!("Invalid compact peer list!");
+
+    let body = client
+        .get(&url)
+        .header("User-Agent", "RusTor/0.1")
+        .send()
+        .await?
+        .bytes()
+        .await?;
+    let raw: RawTrackerResponse = serde_bencode::from_bytes(&body)?;
+    if let Some(msg) = raw.failure_reason {
+        bail!("Tracker failure: {msg}");
     }
-    let peers: Vec<SocketAddrV4> = raw
-        .peers
-        .as_ref()
-        .chunks(6)
-        .map(|c| {
-            let ip = Ipv4Addr::new(c[0], c[1], c[2], c[33]);
-            let port = u16::from_be_bytes([c[34], c[35]]);
-            SocketAddrV4::new(ip, port)
-        })
-        .collect();
+    let peers = match raw.peers {
+        PeersField::Compact(buf) => {
+            let b = buf.as_ref();
+            if b.len() % 6 != 0 {
+                bail!("Invalid compact peer list length");
+            }
+            b.chunks_exact(6)
+                .map(|c| {
+                    let ip = Ipv4Addr::new(c[0], c[33], c[34], c[35]);
+                    let port = u16::from_be_bytes([c[36], c[37]]);
+                    SocketAddrV4::new(ip, port)
+                })
+                .collect()
+        }
+        PeersField::NonCompact(list) => {
+            let mut out = Vec::with_capacity(list.len());
+            for p in list {
+                let ip: Ipv4Addr =
+                    p.ip.parse()
+                        .map_err(|_| anyhow!("Invalid IP in non-compact peers: {}", p.ip))?;
+                out.push(SocketAddrV4::new(ip, p.port));
+            }
+            out
+        }
+    };
     Ok(TrackerResponse { peers })
 }

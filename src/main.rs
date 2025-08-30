@@ -1,10 +1,11 @@
-use crate::Peers::peer::Handshake;
+use crate::Peers::peer::{Handshake, download_first_piece};
 use crate::Torrentfile::magnet::parse_magnet_link;
 use crate::Torrentfile::torrent::TorrentFile;
 use crate::Tracker::{tracker::query_http_tracker, udp::query_udp_tracker};
 use crate::bittorent::connect_to_peer;
 use anyhow::{Result, anyhow};
 use clap::{Parser, Subcommand};
+// use tokio::io::AsyncReadExt;
 
 #[allow(non_snake_case)]
 mod Bencode;
@@ -41,43 +42,56 @@ async fn run_download(target: &str) -> Result<()> {
     use rand::Rng;
 
     let mut peer_id = [0u8; 20];
-
-    let (info_hash, m_trackers, left_hints): ([u8; 20], Vec<String>, u64) =
-        if target.starts_with("magnet:?") {
-            let m = parse_magnet_link(target)?;
-            (
-                m.infohash,
-                if m.trackers.is_empty() {
-                    vec![]
-                } else {
-                    m.trackers
-                },
-                0,
-            )
-        } else {
-            let tf = TorrentFile::from_file(target)?;
-            (
-                tf.info_hash,
-                vec![tf.torrent.announce.clone()],
-                tf.torrent.info.length,
-            )
-        };
-
     peer_id[0..8].copy_from_slice(b"-RS0001-");
     rand::thread_rng().fill(&mut peer_id[8..]);
 
-    let announce = m_trackers
+    let (info_hash, trackers, total_len_opt, piece_length_opt, piece0_hash_opt): (
+        [u8; 20],
+        Vec<String>,
+        Option<u64>,
+        Option<u64>,
+        Option<[u8; 20]>,
+    ) = if target.starts_with("magnet:?") {
+        let m = parse_magnet_link(target)?;
+        (
+            m.infohash,
+            if m.trackers.is_empty() {
+                vec![]
+            } else {
+                m.trackers
+            },
+            None,
+            None,
+            None,
+        )
+    } else {
+        let p0 = [0u8; 20];
+        let tf = TorrentFile::from_file(target)?;
+        (
+            tf.info_hash,
+            vec![tf.torrent.announce.clone()],
+            Some(tf.torrent.info.length),
+            Some(tf.torrent.info.piece_length),
+            Some(p0),
+        )
+    };
+
+    let announce = trackers
         .get(0)
-        .ok_or_else(|| anyhow!("No tracker availabl; magnet without trackers rquires DHT/BEP-5"))?
+        .ok_or_else(|| {
+            anyhow!("No tracker availabl; magnet without trackers rquires DHT (not implemented)")
+        })?
         .clone();
 
     let port = 6881u16;
     let peers = if announce.starts_with("http") {
-        query_http_tracker(&announce, info_hash, peer_id, port, 0, 0, left_hints)
+        let left = total_len_opt.unwrap_or(0);
+        query_http_tracker(&announce, info_hash, peer_id, port, 0, 0, left)
             .await?
             .peers
     } else if announce.starts_with("udp") {
-        query_udp_tracker(&announce, info_hash, peer_id, port, left_hints)
+        let left = total_len_opt.unwrap_or(0);
+        query_udp_tracker(&announce, info_hash, peer_id, port, left)
             .await?
             .peers
     } else {
@@ -91,6 +105,18 @@ async fn run_download(target: &str) -> Result<()> {
     let hs = Handshake::new(info_hash, peer_id);
     Handshake::send_handshake(&mut stream, &hs).await?;
     Handshake::send_interested(&mut stream).await?;
-    Handshake::request_piece(&mut stream, 0, 0, 16 * 1024).await?;
+
+    if let (Some(total_len), Some(piece_len), Some(piece0_hash)) =
+        (total_len_opt, piece_length_opt, piece0_hash_opt)
+    {
+        let data = download_first_piece(&mut stream, piece_len, total_len, piece0_hash).await?;
+        std::fs::write("piece0.bin", &data)?;
+        println!("Wrote piece0.bin ({} bytes)", data.len());
+    } else {
+        println!(
+            "Connected to peer via magnet; full downloading needs BEP-9/10 metadata exchange."
+        );
+    }
+
     Ok(())
 }

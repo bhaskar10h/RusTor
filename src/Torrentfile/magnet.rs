@@ -2,7 +2,6 @@ use anyhow::{Result, anyhow, bail};
 use data_encoding::BASE32;
 use url::Url;
 
-#[allow(dead_code)]
 pub struct MagnetLink {
     pub infohash: [u8; 20],
     pub trackers: Vec<String>,
