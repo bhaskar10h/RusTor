@@ -1,5 +1,5 @@
 [package]
-name = "torrust"
+name = "RusTor"
 version = "0.1.0"
 authors = ["Bhaskar Hemanth <bhaskar96.surya@gmail.com>"]
 edition = "2024"
@@ -14,3 +14,7 @@ url = "2.2"
 rand = "0.8"
 hex = "0.4"
 urlencoding = "2.1"
+anyhow = "1.0.99"
+serde_bytes = "0.11.17"
+clap = { version = "4.5.46", features = ["derive"] }
+data-encoding = "2.9.0"

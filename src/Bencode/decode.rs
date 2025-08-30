@@ -1,9 +1,10 @@
-use crate::bittorent::Torrent;
+use anyhow::Result;
+use serde::de::DeserializeOwned;
 use serde_bencode::{self};
 use std::fs;
 
-pub fn decode_torrent_file(path: &str) -> Result<Torrent, Box<dyn std::error::Error>> {
+pub fn decode_torrent_file<T: DeserializeOwned>(path: &str) -> Result<T> {
     let content = fs::read(path)?;
-    let torrent: Torrent = serde_bencode::from_bytes(&content)?;
+    let torrent: T = serde_bencode::from_bytes(&content)?;
     Ok(torrent)
 }

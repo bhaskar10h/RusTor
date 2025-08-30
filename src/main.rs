@@ -1,10 +1,10 @@
 use crate::Peers::peer::Handshake;
 use crate::Torrentfile::magnet::parse_magnet_link;
 use crate::Torrentfile::torrent::TorrentFile;
-use crate::Tracker::tracker::query_http_tracker;
-use crate::Tracker::udp::query_udp_tracker;
+use crate::Tracker::{tracker::query_http_tracker, udp::query_udp_tracker};
 use crate::bittorent::connect_to_peer;
-use rand::Rng;
+use anyhow::{Result, anyhow};
+use clap::{Parser, Subcommand};
 
 #[allow(non_snake_case)]
 mod Bencode;
@@ -16,61 +16,81 @@ mod Torrentfile;
 mod Tracker;
 mod bittorent;
 
-#[allow(unused_variables)]
+#[derive(Parser)]
+#[command(name = "minibit", version, about = "Minimal Bittorrent client")]
+struct Cli {
+    #[command(subcommand)]
+    command: Commands,
+}
+
+#[derive(Subcommand)]
+enum Commands {
+    Download { torrent: String },
+}
+
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let peer_id: [u8; 20] = rand::thread_rng().r#gen();
-    let port = 6881;
+async fn main() -> Result<()> {
+    let cli = Cli::parse();
+    match cli.command {
+        Commands::Download { torrent } => run_download(&torrent).await?,
+    }
+    Ok(())
+}
 
-    let torrent_path = "src/.torrent-files/debian.torrent";
-    let torrent_file = TorrentFile::from_file(torrent_path).map_err(|e| {
-        eprintln!("Torrent file error: {:?}", e);
-        panic!("Failed to parse torrent file: {:?}", e);
-    })?;
-    let info_hash = torrent_file.info_hash;
-    let announce = torrent_file.torrent.announce.clone();
+async fn run_download(target: &str) -> Result<()> {
+    use rand::Rng;
 
-    // Example magnet link parsing (optional)
-    let magnet = parse_magnet_link(
-        "magnet:?xt=urn:btih:1234567890123456789012345678901234567890&tr=udp://tracker.example.com:6969",
-    )?;
-    let info_hash_magnet = magnet.infohash;
-    let trackers = magnet.trackers;
+    let mut peer_id = [0u8; 20];
 
-    // Query tracker
-    let tracker_response = if announce.starts_with("http") {
-        query_http_tracker(
-            &announce,
-            info_hash,
-            peer_id,
-            port,
-            0,
-            torrent_file.torrent.info.length,
-            0,
-        )
-        .map_err(|e| {
-            eprintln!("HTTP tracker error: {:?}", e);
-            panic!("Failed to query HTTP tracker: {:?}", e);
-        })?
+    let (info_hash, m_trackers, left_hints): ([u8; 20], Vec<String>, u64) =
+        if target.starts_with("magnet:?") {
+            let m = parse_magnet_link(target)?;
+            (
+                m.infohash,
+                if m.trackers.is_empty() {
+                    vec![]
+                } else {
+                    m.trackers
+                },
+                0,
+            )
+        } else {
+            let tf = TorrentFile::from_file(target)?;
+            (
+                tf.info_hash,
+                vec![tf.torrent.announce.clone()],
+                tf.torrent.info.length,
+            )
+        };
+
+    peer_id[0..8].copy_from_slice(b"-RS0001-");
+    rand::thread_rng().fill(&mut peer_id[8..]);
+
+    let announce = m_trackers
+        .get(0)
+        .ok_or_else(|| anyhow!("No tracker availabl; magnet without trackers rquires DHT/BEP-5"))?
+        .clone();
+
+    let port = 6881u16;
+    let peers = if announce.starts_with("http") {
+        query_http_tracker(&announce, info_hash, peer_id, port, 0, 0, left_hints)
+            .await?
+            .peers
     } else if announce.starts_with("udp") {
-        query_udp_tracker(&announce, info_hash, peer_id, port)
-            .await
-            .map_err(|e| {
-                eprintln!("UDP tracker error: {:?}", e);
-                panic!("Failed to query UDP tracker: {:?}", e);
-            })?
+        query_udp_tracker(&announce, info_hash, peer_id, port, left_hints)
+            .await?
+            .peers
     } else {
-        return Err("Unsupported tracker protocol".into());
+        anyhow::bail!("Unsupported tracker protocol: {announce}");
+    };
+    let Some(peer) = peers.first() else {
+        anyhow::bail!("Tracker returned no peers");
     };
 
-    // Connect to a peer
-    if let Some(peer) = tracker_response.peers.first() {
-        let mut stream = connect_to_peer(*peer).await?;
-        let handshake = Handshake::new(info_hash, peer_id);
-        Handshake::send_handshake(&mut stream, &handshake).await?;
-        Handshake::send_interested(&mut stream).await?;
-        Handshake::request_piece(&mut stream, 0, 0, 16 * 1024).await?;
-    }
-
+    let mut stream = connect_to_peer(*peer).await?;
+    let hs = Handshake::new(info_hash, peer_id);
+    Handshake::send_handshake(&mut stream, &hs).await?;
+    Handshake::send_interested(&mut stream).await?;
+    Handshake::request_piece(&mut stream, 0, 0, 16 * 1024).await?;
     Ok(())
 }

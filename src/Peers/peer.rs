@@ -1,3 +1,4 @@
+use anyhow::{Result, anyhow};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::TcpStream,
@@ -32,21 +33,20 @@ impl Handshake {
         bytes
     }
 
-    pub async fn send_handshake(
-        stream: &mut TcpStream,
-        handshake: &Handshake,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn send_handshake(stream: &mut TcpStream, handshake: &Handshake) -> Result<()> {
         stream.write_all(&handshake.to_bytes()).await?;
         let mut response = [0u8; 68];
         stream.read_exact(&mut response).await?;
-        // Verify response
         if response[0] != 19 || &response[1..20] != b"BitTorrent protocol" {
-            return Err("Invalid handshake response".into());
+            return Err(anyhow!("Invalid handshake response"));
+        }
+        if &response[28..48] != &handshake.infohash {
+            return Err(anyhow!("Mismatched hash in handshake!..."));
         }
         Ok(())
     }
 
-    pub async fn send_interested(stream: &mut TcpStream) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn send_interested(stream: &mut TcpStream) -> Result<()> {
         let message = vec![0, 0, 0, 1, 2]; // ID 2: Interested
         stream.write_all(&message).await?;
         Ok(())
@@ -57,8 +57,10 @@ impl Handshake {
         index: u32,
         begin: u32,
         length: u32,
-    ) -> Result<(), Box<dyn std::error::Error>> {
-        let mut message = vec![0, 0, 0, 13, 6]; // ID 6: Request, 13 bytes
+    ) -> Result<()> {
+        let mut message = Vec::with_capacity(17);
+        message.extend_from_slice(&13u32.to_be_bytes());
+        message.push(6);
         message.extend_from_slice(&index.to_be_bytes());
         message.extend_from_slice(&begin.to_be_bytes());
         message.extend_from_slice(&length.to_be_bytes());
