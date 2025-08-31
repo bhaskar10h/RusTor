@@ -10,7 +10,7 @@
   
   <div style="border-left: 4px solid #6f42c1; padding-left: 10px;">
     <span style="color: #6f42c1; font-style: Italic;">&#x2753; Important</span><br>
-    This project is in early stage (far from fully functional), Many errors are still need to addressed!...
+    This project is in an early stage (far from fully functional), Many errors still need to be addressed!...
   </div>
 
   ## Features
