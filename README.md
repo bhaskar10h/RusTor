@@ -8,6 +8,12 @@
   Bencode encoding/decoding, peer communication, and tracker interactions.
   This project aims to provide a lightweight and efficient implementation of the BitTorrent protocol.
 
+  
+  <div style="border-left: 4px solid #6f42c1; padding-left: 10px;">
+    <span style="color: #6f42c1;">&#x2753; Important</span><br>
+    This project is in early stage (far from fully functional), Many errors are still need to addressed!...
+  </div>
+
   ## Features
 
   - [x] **Bencode Parsing**: Encode and decode Bencode data for torrent files.
